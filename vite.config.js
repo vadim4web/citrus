@@ -5,6 +5,6 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig(({ command }) => ({
   plugins: [vue()],
   base: command === 'build'
-    ? '/cssscope/'  // repo name for GitHub Pages
+    ? '/citrus/'  // repo name for GitHub Pages
     : '/',          // local dev
 }))
