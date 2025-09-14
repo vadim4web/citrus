@@ -1,18 +1,21 @@
 {
   "name": "cssscope",
   "private": true,
+  "homepage": "https://vadim4web.github.io/cssscope",
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "vue": "^3.5.18"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.1",
+    "gh-pages": "^6.3.0",
     "vite": "^7.1.2"
   }
 }
