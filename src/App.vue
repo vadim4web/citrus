@@ -1,9 +1,15 @@
 <template>
 	<div class="p-6">
 		<h1 class="cssscope text-2xl font-bold mb-4 py-3 leading-9">
-			🍊<strong>Citrus <span class="analyze">(C3S)</span> Analyzer</strong> |
-			<i>CSS S</i>cope <em class="analyze">Analyzer</em>
+			🍊<strong>Citrus <span class="analyze">(C³S)</span> Analyzer</strong> |
+			<i>CSS•S</i>cope <em class="analyze">Analyzer</em>
 		</h1>
+
+    <div id="moto-wrap">
+      <h2 id="moto" class="w-full my-5 text-[3.5rem]" >
+        Uncover Your <em>Real</em> CSS Power Props
+      </h2>
+    </div>
 
 		<div class="mb-10 mode">
 			<label
@@ -104,24 +110,27 @@
 				<tbody v-else>
 					<tr v-for="i in +topN" :key="i">
 						<td
-							class="border border-gray-300 px-2 py-1 relative after:absolute after:content-['-'] after:right-0"
+							class="border border-gray-300 px-2 py-1"
 						>
 							{{ i }}
 						</td>
 						<td
-							class="border border-gray-300 px-2 py-1 relative before:absolute before:content-['-'] before:left-0"
+							class="border border-gray-300 px-2 py-1"
 						>
-							null
+							{{ randomItems[i - 1] }}
 						</td>
 					</tr>
 				</tbody>
 			</table>
 		</div>
 	</div>
+  <footer class="fixed bottom-0 left-0 right-0">
+    © {{ new Date().getFullYear() }} <a href="http://github.com/vadim4web" target="_blank" rel="noopener noreferrer">vadim4web</a>
+  </footer>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 
 // -------------------------
 // Reactive state
@@ -136,24 +145,12 @@ const loading = ref(false)
 const summary = ref(null)
 const currentStatus = ref('')
 const elapsed = ref(0) // ⏱ elapsed timer
-let timerId = null
+let timerId, setupRandomId = null
 let allResults = [] // Global RAM storage
 
 const corsProxy = 'https://api.allorigins.win/raw?url='
 // const apiURL = 'http://localhost:3000/api'
 const apiURL = 'https://citrus-api.onrender.com/api'
-
-// Start/stop elapsed timer
-function startTimer() {
-	elapsed.value = 0
-	timerId = setInterval(() => {
-		elapsed.value++
-	}, 1000)
-}
-function stopTimer() {
-	clearInterval(timerId)
-	timerId = null
-}
 
 // -------------------------
 // Standard CSS properties
@@ -558,6 +555,32 @@ const standardProps = new Set([
 	'zoom',
 ])
 
+const props = Array.from(standardProps)
+const randomIdx = arr => Math.floor(Math.random() * arr.length)
+const randomItem = arr => arr[randomIdx(arr)]
+const randomItems = ref(new Array(+topN.value).fill(null).map(el => randomItem(props)))
+
+function setupRandom() {
+	setupRandomId = setInterval(() => {
+    randomItems.value[randomIdx(randomItems.value)] = randomItem(props)
+	}, 500)
+}
+
+onMounted(() => setupRandom())
+
+// Start/stop elapsed timer
+function startTimer() {
+  elapsed.value = 0
+	timerId = setInterval(() => {
+    elapsed.value++
+	}, 1000)
+}
+function stopTimer() {
+  clearInterval(setupRandomId)
+	clearInterval(timerId)
+	timerId = null
+}
+
 // -------------------------
 // Restore last inputs from localStorage
 // -------------------------
@@ -591,6 +614,7 @@ watch(
 // -------------------------
 watch(topN, val => {
 	if (allResults.length) results.value = allResults.slice(0, val)
+  randomItems.value = new Array(+topN.value).fill(null).map(el => randomItem(props))
 })
 
 function updateResults(totalCounts) {
