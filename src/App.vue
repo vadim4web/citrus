@@ -106,7 +106,6 @@ const repo = ref('')
 const topN = ref(4)
 const results = ref([])
 const loading = ref(false)
-const localToken = ref(import.meta.env.VITE_GITHUB_TOKEN || '')
 const summary = ref(null)
 const currentStatus = ref("")
 const elapsed = ref(0)     // ⏱ elapsed timer
@@ -114,7 +113,8 @@ let timerId = null
 let allResults = []  // Global RAM storage
 
 const corsProxy = "https://api.allorigins.win/raw?url="
-const token = () => localToken.value || ''
+// const apiURL = 'http://localhost:3000/api'
+const apiURL = 'https://citrus-api.onrender.com/api'
 
 // Start/stop elapsed timer
 function startTimer() {
@@ -248,17 +248,15 @@ username.value = savedInputs.username || ''
 repo.value = savedInputs.repo || ''
 url.value = savedInputs.url || ''
 topN.value = savedInputs.topN || 4
-localToken.value = savedInputs.localToken || ''
 
 // Watch inputs & save to localStorage
-watch([mode, username, repo, url, topN, localToken], () => {
+watch([mode, username, repo, url, topN], () => {
   localStorage.setItem('cssscopeInputs', JSON.stringify({
     mode: mode.value,
     username: username.value,
     repo: repo.value,
     url: url.value,
     topN: topN.value,
-    localToken: localToken.value
   }))
 }, { deep: true })
 
@@ -347,92 +345,67 @@ async function analyzeURL(siteURL){
 // GitHub helpers
 // -------------------------
 async function fetchJSON(url) {
-  const res = await fetch(url, {
-    headers: {
-      Authorization: token() ? `Bearer ${token()}` : undefined,
-      Accept: "application/vnd.github.v3+json"
-    }
-  })
-  if (!res.ok) throw new Error(res.status + ' ' + res.statusText)
-  return res.json()
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+  return res.json();
 }
 
-async function getAllCSSFiles(owner, repoName, path = "", branch = "main") {
-  const url = `https://api.github.com/repos/${owner}/${repoName}/contents/${path}?ref=${branch}`
-  try {
-    const items = await fetchJSON(url)
-    let files = []
-    for (const item of items) {
-      if (item.type === "file" && item.name.endsWith(".css")) files.push(item.download_url)
-      else if (item.type === "dir") {
-        const nested = await getAllCSSFiles(owner, repoName, item.path, branch)
-        files.push(...nested)
-      }
-    }
-    return files
-  } catch(e) {
-    if (e.message.startsWith("404")) {
-      console.warn(`Repo ${owner}/${repoName} branch ${branch} is empty or path not found.`)
-      return []
-    }
-    throw e
-  }
+async function getAllCSSFiles(owner, repoName) {
+  const url = `${apiURL}/files?username=${owner}&repo=${repoName}`;
+  return fetchJSON(url); // returns array of CSS file URLs
 }
 
-// -------------------------
-// Main analyze function
-// -------------------------
 async function analyze() {
-  results.value = []
-  summary.value = null
-  loading.value = true
-  startTimer()
-  const startTime = performance.now()
-  let repoCount = 0, fileCount = 0, totalBytes=0
+  results.value = [];
+  summary.value = null;
+  loading.value = true;
+  startTimer();
+  const startTime = performance.now();
+  let repoCount = 0, fileCount = 0, totalBytes = 0;
 
   try {
     if (mode.value === 'url') {
-      await analyzeURL(url.value)
-      return
+      await analyzeURL(url.value);
+      return;
     }
 
-    // GitHub mode
-    let repos = []
+    // GitHub mode via backend
+    let repos = [];
     if (repo.value) {
-      repos = [await fetchJSON(`https://api.github.com/repos/${username.value}/${repo.value}`)]
+      repos = await fetchJSON(`${apiURL}/repos?username=${username.value}&repo=${repo.value}`);
     } else {
-      repos = await fetchJSON(`https://api.github.com/users/${username.value}/repos?per_page=100`)
+      repos = await fetchJSON(`${apiURL}/repos?username=${username.value}`);
     }
 
-    repoCount = repos.length
-    let totalCounts = {}
+    repoCount = repos.length;
+    let totalCounts = {};
 
     for (const r of repos) {
-      const branch = r.default_branch || "main"
-      console.log(`Fetching repo contents: ${username.value}/${r.name} branch: ${branch}`)
-      const cssFiles = await getAllCSSFiles(username.value, r.name, "", branch)
-      fileCount += cssFiles.length
+      const branch = r.default_branch || 'main';
+      const cssFiles = await getAllCSSFiles(username.value, r.name);
 
-      for (const url of cssFiles) {
-        const res = await fetch(url)
-        if (!res.ok) continue
-        const text = await res.text()
-        totalBytes += new TextEncoder().encode(text).length
-        const counts = extractCSSProps(text)
-        for (const [prop, cnt] of Object.entries(counts)) totalCounts[prop] = (totalCounts[prop]||0)+cnt
+      fileCount += cssFiles.length;
+      for (const fileUrl of cssFiles) {
+        const res = await fetch(fileUrl);
+        if (!res.ok) continue;
+        const text = await res.text();
+        totalBytes += new TextEncoder().encode(text).length;
+        const counts = extractCSSProps(text);
+        for (const [prop, cnt] of Object.entries(counts)) totalCounts[prop] = (totalCounts[prop] || 0) + cnt;
       }
     }
 
-    updateResults(totalCounts)
+    updateResults(totalCounts);
 
     summary.value = {
-      time: (performance.now() - startTime)/1000,
+      time: (performance.now() - startTime) / 1000,
       repos: repoCount,
       files: fileCount,
       properties: Object.keys(totalCounts).length,
       bytes: totalBytes
-    }
-  } catch(e) { alert("Error: " + e.message) }
-  finally { loading.value=false; stopTimer() }
+    };
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally { loading.value = false; stopTimer(); }
 }
 </script>
